@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viv's Pokedex</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        body {
+            background: #cc0000;
+            min-height: 100vh;
+            padding: 30px;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 120px;
+            background: #8b0000;
+            border-bottom: 8px solid #000;
+        }
+        
+        body::after {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 50px;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle at 30% 30%, #4db8ff, #0066cc);
+            border-radius: 50%;
+            border: 6px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 48px;
+            font-weight: 400;
+            margin-bottom: 40px;
+            margin-top: 100px;
+            color: #fff;
+            text-shadow: 4px 4px 0px #000;
+            position: relative;
+            z-index: 10;
+            font-family: 'Press Start 2P', cursive;
+            letter-spacing: 2px;
+        }
+
+        .pokemon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 10;
+        }
+
+        .pokemon-card {
+            background: linear-gradient(to bottom, #1a1a1a 0%, #0d0d0d 100%);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.1), 0 8px 16px rgba(0,0,0,0.5);
+            border: 3px solid #333;
+            position: relative;
+        }
+        
+        .pokemon-card::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            z-index: 0;
+        }
+
+        .pokemon-card:hover {
+            transform: translateY(-12px) rotate(-2deg) scale(1.1);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.25);
+        }
+
+        .pokemon-card:active {
+            transform: scale(0.95);
+        }
+
+        .pokemon-card img {
+            width: 96px;
+            height: 96px;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            object-fit: contain;
+            position: relative;
+            z-index: 1;
+            filter: brightness(1.1);
+        }
+
+        .pokemon-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #4db8ff;
+            margin-top: 8px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 0 5px rgba(77, 184, 255, 0.5);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background: linear-gradient(to bottom, #1a1a1a 0%, #0d0d0d 100%);
+            border-radius: 20px;
+            border: 6px solid #333;
+            padding: 25px;
+            max-width: 1100px;
+            width: 96vw;
+            max-height: 94vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.1), 0 20px 40px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Custom scrollbar for modal */
+        .modal-content::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        .modal-content::-webkit-scrollbar-track {
+            background: #0d0d0d;
+            border-radius: 10px;
+        }
+        
+        .modal-content::-webkit-scrollbar-thumb {
+            background: #4db8ff;
+            border-radius: 10px;
+        }
+        
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: #6dc8ff;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 32px;
+            cursor: pointer;
+            background: #cc0000;
+            color: white;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #000;
+            font-weight: 900;
+            transition: all 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+
+        .close-btn:hover {
+            background: #ff0000;
+            transform: scale(1.1);
+        }
+
+        .modal-pokemon-img {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 15px;
+            display: block;
+            image-rendering: pixelated;
+            object-fit: contain;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .modal-name {
+            font-size: 40px;
+            font-weight: 900;
+            text-align: center;
+            color: #4db8ff;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(77, 184, 255, 0.5), 2px 2px 4px #000;
+        }
+
+        .types-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 15px;
+            margin-bottom: 0px;
+            flex-wrap: wrap;
+        }
+
+        .type-badge {
+            padding: 8px 20px;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: 17px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .type-icon {
+            font-size: 24px;
+        }
+
+        .evolution-section {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 18px;
+            border: 2px solid #444;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+        }
+
+        .evolution-title {
+            font-size: 30px;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 15px;
+            color: #4db8ff;
+            text-shadow: 0 0 8px rgba(77, 184, 255, 0.5);
+        }
+
+        .evolution-chain {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .evolution-stage {
+            text-align: center;
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+            border: 2px solid #333;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .evolution-stage:hover {
+            background: #252525;
+            border-color: #4db8ff;
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 16px rgba(77, 184, 255, 0.3);
+        }
+        
+        .evolution-stage.seen {
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+        }
+        
+        .evolution-stage.seen::after {
+            content: '✓';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #00ff00;
+            color: #000;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 14px;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.8);
+        }
+
+        .evolution-stage img {
+            width: 75px;
+            height: 75px;
+            image-rendering: pixelated;
+            object-fit: contain;
+        }
+
+        .evolution-stage-name {
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 6px;
+            color: #4db8ff;
+        }
+
+        .evolution-arrow {
+            font-size: 32px;
+            font-weight: 900;
+            color: #4db8ff;
+        }
+        
+        .pokemon-description {
+            background: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+        }
+        
+        .pokemon-description p {
+            color: #4db8ff;
+            font-size: 15px;
+            line-height: 1.5;
+            text-align: center;
+            letter-spacing: 0.5px;
+            margin: 0;
+        }
+        
+        .seen-checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 15px;
+            padding: 14px;
+            background: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        
+        .seen-checkbox-container:hover {
+            background: #252525;
+            border-color: #4db8ff;
+        }
+        
+        .seen-checkbox {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #4db8ff;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0d0d0d;
+            transition: all 0.2s;
+        }
+        
+        .seen-checkbox.checked {
+            background: #4db8ff;
+            box-shadow: 0 0 15px rgba(77, 184, 255, 0.5);
+        }
+        
+        .seen-checkbox.checked::after {
+            content: '✓';
+            color: #000;
+            font-size: 22px;
+            font-weight: 900;
+        }
+        
+        .seen-label {
+            color: #4db8ff;
+            font-size: 17px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .favorite-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 40px;
+            z-index: 100;
+            filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.5));
+            color: #FFD700;
+        }
+        
+        .favorite-btn:hover {
+            transform: scale(1.2) rotate(15deg);
+            filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
+        }
+        
+        .favorite-btn.active {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .pokemon-card.favorite {
+            position: relative;
+            border: 4px solid #FFD700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+        
+        .pokemon-card.seen {
+            position: relative;
+            border: 4px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+        
+        .pokemon-card.seen::after {
+            content: '✓';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #00ff00;
+            color: #000;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 16px;
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+        }
+        
+        .search-container {
+            max-width: 600px;
+            margin: 0 auto 40px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 18px 24px;
+            font-size: 20px;
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(to bottom, #1a1a1a 0%, #0d0d0d 100%);
+            border: 4px solid #4db8ff;
+            border-radius: 15px;
+            color: #4db8ff;
+            text-align: center;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.5), 0 0 20px rgba(77, 184, 255, 0.3);
+            transition: all 0.3s;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #fff;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.5), 0 0 30px rgba(77, 184, 255, 0.6);
+        }
+        
+        .search-box::placeholder {
+            color: #4db8ff;
+            opacity: 0.5;
+        }
+        
+        .pokemon-card.hidden {
+            display: none;
+        }
+
+        .no-evolve {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 18px;
+            text-align: center;
+            border: 2px solid #444;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+        }
+
+        /* Type Colors */
+        .type-normal { background: linear-gradient(135deg, #d4b896 0%, #a8927d 100%); }
+        .type-fire { background: linear-gradient(135deg, #F08030 0%, #DD6610 100%); }
+        .type-water { background: linear-gradient(135deg, #6890F0 0%, #386CEB 100%); }
+        .type-electric { background: linear-gradient(135deg, #F8D030 0%, #F0C108 100%); }
+        .type-grass { background: linear-gradient(135deg, #78C850 0%, #5CA935 100%); }
+        .type-ice { background: linear-gradient(135deg, #98D8D8 0%, #69C6C6 100%); }
+        .type-fighting { background: linear-gradient(135deg, #C03028 0%, #9D2721 100%); }
+        .type-poison { background: linear-gradient(135deg, #A040A0 0%, #803380 100%); }
+        .type-ground { background: linear-gradient(135deg, #E0C068 0%, #D4A82F 100%); }
+        .type-flying { background: linear-gradient(135deg, #A890F0 0%, #9180C4 100%); }
+        .type-psychic { background: linear-gradient(135deg, #F85888 0%, #F61C5D 100%); }
+        .type-bug { background: linear-gradient(135deg, #A8B820 0%, #8D9A1B 100%); }
+        .type-rock { background: linear-gradient(135deg, #B8A038 0%, #A48C2E 100%); }
+        .type-ghost { background: linear-gradient(135deg, #705898 0%, #554374 100%); }
+        .type-dragon { background: linear-gradient(135deg, #7038F8 0%, #4C08EF 100%); }
+        .type-dark { background: linear-gradient(135deg, #705848 0%, #513F34 100%); }
+        .type-steel { background: linear-gradient(135deg, #B8B8D0 0%, #9797BA 100%); }
+        .type-fairy { background: linear-gradient(135deg, #EE99AC 0%, #EC6D9A 100%); }
+    </style>
+</head>
+<body>
+    <h1>⭐ VIV'S POKEDEX ⭐</h1>
+    
+    <!-- Search Box -->
+    <div class="search-container">
+        <input type="text" id="searchBox" class="search-box" placeholder="Search by name or type..." oninput="filterPokemon()">
+    </div>
+    
+    <!-- Pokedex decorative buttons -->
+    <div style="position: fixed; top: 30px; right: 50px; z-index: 5; display: flex; gap: 15px;">
+        <div style="width: 30px; height: 30px; background: #ffff00; border-radius: 50%; border: 3px solid #000; box-shadow: 0 0 10px rgba(255,255,0,0.5);"></div>
+        <div style="width: 30px; height: 30px; background: #ff0000; border-radius: 50%; border: 3px solid #000;"></div>
+        <div style="width: 30px; height: 30px; background: #00ff00; border-radius: 50%; border: 3px solid #000;"></div>
+    </div>
+    
+    <div class="pokemon-grid" id="pokemonGrid"></div>
+
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal()">×</button>
+            <button class="favorite-btn" id="favoriteBtn" onclick="toggleFavorite(event)">⭐</button>
+            <img id="modalImg" class="modal-pokemon-img" src="" alt="">
+            <div class="modal-name" id="modalName"></div>
+            <div class="pokemon-description" id="pokemonDescription"></div>
+            <div id="evolutionSection"></div>
+            <div class="types-container" id="modalTypes"></div>
+            <div class="seen-checkbox-container" id="seenCheckbox" onclick="toggleSeen(event)">
+                <div class="seen-checkbox" id="seenCheckboxIcon"></div>
+                <div class="seen-label">Mark as Seen</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const typeIcons = {
+            'normal': '⚪', 'fire': '🔥', 'water': '💧', 'electric': '⚡',
+            'grass': '🌿', 'ice': '❄️', 'fighting': '👊', 'poison': '☠️',
+            'ground': '🌍', 'flying': '🦅', 'psychic': '🔮', 'bug': '🐛',
+            'rock': '🪨', 'ghost': '👻', 'dragon': '🐉', 'dark': '🌙',
+            'steel': '⚙️', 'fairy': '✨'
+        };
+
+        const pokemonData = [
+            { id: 1, name: "Bulbasaur", types: ["grass", "poison"], evolutions: [1, 2, 3], description: "A strange seed was planted on its back at birth. The plant sprouts and grows with this Pokemon." },
+            { id: 2, name: "Ivysaur", types: ["grass", "poison"], evolutions: [1, 2, 3], description: "When the bulb on its back grows large, it appears to lose the ability to stand on its hind legs." },
+            { id: 3, name: "Venusaur", types: ["grass", "poison"], evolutions: [1, 2, 3], description: "The plant blooms when it is absorbing solar energy. It stays on the move to seek sunlight." },
+            { id: 4, name: "Charmander", types: ["fire"], evolutions: [4, 5, 6], description: "Obviously prefers hot places. When it rains, steam is said to spout from the tip of its tail." },
+            { id: 5, name: "Charmeleon", types: ["fire"], evolutions: [4, 5, 6], description: "When it swings its burning tail, it elevates the temperature to unbearably high levels." },
+            { id: 6, name: "Charizard", types: ["fire", "flying"], evolutions: [4, 5, 6], description: "Spits fire that is hot enough to melt boulders. Known to cause forest fires unintentionally." },
+            { id: 7, name: "Squirtle", types: ["water"], evolutions: [7, 8, 9], description: "After birth, its back swells and hardens into a shell. Powerfully sprays foam from its mouth." },
+            { id: 8, name: "Wartortle", types: ["water"], evolutions: [7, 8, 9], description: "Often hides in water to stalk unwary prey. For swimming fast, it moves its ears to maintain balance." },
+            { id: 9, name: "Blastoise", types: ["water"], evolutions: [7, 8, 9], description: "A brutal Pokemon with pressurized water jets on its shell. They are used for high speed tackles." },
+            { id: 10, name: "Caterpie", types: ["bug"], evolutions: [10, 11, 12], description: "Its short feet are tipped with suction pads that enable it to tirelessly climb slopes and walls." },
+            { id: 11, name: "Metapod", types: ["bug"], evolutions: [10, 11, 12], description: "This Pokemon is vulnerable to attack while its shell is soft, exposing its weak and tender body." },
+            { id: 12, name: "Butterfree", types: ["bug", "flying"], evolutions: [10, 11, 12], description: "In battle, it flaps its wings at high speed to release highly toxic dust into the air." },
+            { id: 13, name: "Weedle", types: ["bug", "poison"], evolutions: [13, 14, 15], description: "Often found in forests, eating leaves. It has a sharp venomous stinger on its head." },
+            { id: 14, name: "Kakuna", types: ["bug", "poison"], evolutions: [13, 14, 15], description: "Almost incapable of moving, this Pokemon can only harden its shell to protect itself from predators." },
+            { id: 15, name: "Beedrill", types: ["bug", "poison"], evolutions: [13, 14, 15], description: "Flies at high speed and attacks using its large venomous stingers on its forelegs and tail." },
+            { id: 16, name: "Pidgey", types: ["normal", "flying"], evolutions: [16, 17, 18], description: "A common sight in forests and woods. It flaps its wings at ground level to kick up blinding sand." },
+            { id: 17, name: "Pidgeotto", types: ["normal", "flying"], evolutions: [16, 17, 18], description: "Very protective of its sprawling territorial area, this Pokemon will fiercely peck at any intruder." },
+            { id: 18, name: "Pidgeot", types: ["normal", "flying"], evolutions: [16, 17, 18], description: "When hunting, it skims the surface of water at high speed to pick off unwary prey such as Magikarp." },
+            { id: 19, name: "Rattata", types: ["normal"], evolutions: [19, 20], description: "Bites anything when it attacks. Small and very quick, it is a common sight in many places." },
+            { id: 20, name: "Raticate", types: ["normal"], evolutions: [19, 20], description: "It uses its whiskers to maintain its balance. It apparently slows down if they are cut off." },
+            { id: 21, name: "Spearow", types: ["normal", "flying"], evolutions: [21, 22], description: "Eats bugs in grassy areas. It has to flap its short wings at high speed to stay airborne." },
+            { id: 22, name: "Fearow", types: ["normal", "flying"], evolutions: [21, 22], description: "With its huge and magnificent wings, it can keep aloft without ever having to land for rest." },
+            { id: 23, name: "Ekans", types: ["poison"], evolutions: [23, 24], description: "Moves silently and stealthily. Eats the eggs of birds, such as Pidgey and Spearow, whole." },
+            { id: 24, name: "Arbok", types: ["poison"], evolutions: [23, 24], description: "It is rumored that the ferocious warning markings on its belly differ from area to area." },
+            { id: 25, name: "Pikachu", types: ["electric"], evolutions: [25, 26], description: "When several of these Pokemon gather, their electricity could build and cause lightning storms." },
+            { id: 26, name: "Raichu", types: ["electric"], evolutions: [25, 26], description: "It keeps its tail raised to monitor its surroundings. If you yank its tail, it will try to bite you." },
+            { id: 27, name: "Sandshrew", types: ["ground"], evolutions: [27, 28], description: "Burrows deep underground in arid locations far from water. It only emerges to hunt for food." },
+            { id: 28, name: "Sandslash", types: ["ground"], evolutions: [27, 28], description: "Curls up into a spiny ball when threatened. It can roll while curled up to attack or escape." },
+            { id: 29, name: "Nidoran♀", types: ["poison"], evolutions: [29, 30, 31], description: "Although small, its venomous barbs render this Pokemon dangerous. The female has smaller horns." },
+            { id: 30, name: "Nidorina", types: ["poison"], evolutions: [29, 30, 31], description: "The female's horn develops slowly. Prefers physical attacks such as clawing and biting." },
+            { id: 31, name: "Nidoqueen", types: ["poison", "ground"], evolutions: [29, 30, 31], description: "Its hard scales provide strong protection. It uses its powerful body to execute rampaging attacks." },
+            { id: 32, name: "Nidoran♂", types: ["poison"], evolutions: [32, 33, 34], description: "Stiffens its ears to sense danger. The larger its horns, the more powerful its secreted venom." },
+            { id: 33, name: "Nidorino", types: ["poison"], evolutions: [32, 33, 34], description: "An aggressive Pokemon that is quick to attack. The horn on its head secretes a powerful venom." },
+            { id: 34, name: "Nidoking", types: ["poison", "ground"], evolutions: [32, 33, 34], description: "It uses its powerful tail in battle to smash, constrict, then break the prey's bones." },
+            { id: 35, name: "Clefairy", types: ["fairy"], evolutions: [35, 36], description: "Its magical and cute appeal has many admirers. It is rare and found only in certain areas." },
+            { id: 36, name: "Clefable", types: ["fairy"], evolutions: [35, 36], description: "A timid fairy Pokemon that is rarely seen. It will run and hide the moment it senses people." },
+            { id: 37, name: "Vulpix", types: ["fire"], evolutions: [37, 38], description: "At the time of birth, it has just one tail. The tail splits from its tip as it grows older." },
+            { id: 38, name: "Ninetales", types: ["fire"], evolutions: [37, 38], description: "Very smart and very vengeful. Grabbing one of its many tails could result in a 1000-year curse." },
+            { id: 39, name: "Jigglypuff", types: ["normal", "fairy"], evolutions: [39, 40], description: "When its huge eyes light up, it sings a mysteriously soothing melody that lulls its enemies to sleep." },
+            { id: 40, name: "Wigglytuff", types: ["normal", "fairy"], evolutions: [39, 40], description: "Its body is soft and rubbery. When angered, it will suck in air and inflate itself to an enormous size." },
+            { id: 41, name: "Zubat", types: ["poison", "flying"], evolutions: [41, 42], description: "Forms colonies in perpetually dark places. Uses ultrasonic waves to identify and approach targets." },
+            { id: 42, name: "Golbat", types: ["poison", "flying"], evolutions: [41, 42], description: "Once it strikes, it will not stop draining energy from the victim even if it gets too heavy to fly." },
+            { id: 43, name: "Oddish", types: ["grass", "poison"], evolutions: [43, 44, 45], description: "During the day, it keeps its face buried in the ground. At night, it wanders around sowing its seeds." },
+            { id: 44, name: "Gloom", types: ["grass", "poison"], evolutions: [43, 44, 45], description: "The fluid that oozes from its mouth isn't drool. It is a nectar that is used to attract prey." },
+            { id: 45, name: "Vileplume", types: ["grass", "poison"], evolutions: [43, 44, 45], description: "The larger its petals, the more toxic pollen it contains. Its big head is heavy and hard to hold up." },
+            { id: 46, name: "Paras", types: ["bug", "grass"], evolutions: [46, 47], description: "Burrows to suck tree roots. The mushrooms on its back grow by drawing nutrients from the bug host." },
+            { id: 47, name: "Parasect", types: ["bug", "grass"], evolutions: [46, 47], description: "A host-parasite pair in which the parasite mushroom has taken over the host bug. Prefers damp places." },
+            { id: 48, name: "Venonat", types: ["bug", "poison"], evolutions: [48, 49], description: "Lives in the shadows of tall trees where it eats insects. It is attracted by light at night." },
+            { id: 49, name: "Venomoth", types: ["bug", "poison"], evolutions: [48, 49], description: "The dust-like scales covering its wings are color coded to indicate the kinds of poison it has." },
+            { id: 50, name: "Diglett", types: ["ground"], evolutions: [50, 51], description: "Lives about one yard underground where it feeds on plant roots. It sometimes appears above ground." },
+            { id: 51, name: "Dugtrio", types: ["ground"], evolutions: [50, 51], description: "A team of Diglett triplets. It triggers huge earthquakes by burrowing 60 miles underground." },
+            { id: 52, name: "Meowth", types: ["normal"], evolutions: [52, 53], description: "Adores circular objects. Wanders the streets on a nightly basis to look for dropped loose change." },
+            { id: 53, name: "Persian", types: ["normal"], evolutions: [52, 53], description: "Although its fur has many admirers, it is tough to raise as a pet because of its fickle meanness." },
+            { id: 54, name: "Psyduck", types: ["water"], evolutions: [54, 55], description: "While lulling its enemies with its vacant look, this wily Pokemon will use psychokinetic powers." },
+            { id: 55, name: "Golduck", types: ["water"], evolutions: [54, 55], description: "Often seen swimming elegantly by lake shores. It is often mistaken for the Japanese monster, Kappa." },
+            { id: 56, name: "Mankey", types: ["fighting"], evolutions: [56, 57], description: "Extremely quick to anger. It could be docile one moment then thrashing away the next instant." },
+            { id: 57, name: "Primeape", types: ["fighting"], evolutions: [56, 57], description: "Always furious and tenacious to boot. It will not abandon chasing its quarry until it is caught." },
+            { id: 58, name: "Growlithe", types: ["fire"], evolutions: [58, 59], description: "Very protective of its territory. It will bark and bite to repel intruders from its space." },
+            { id: 59, name: "Arcanine", types: ["fire"], evolutions: [58, 59], description: "A Pokemon that has been admired since the past for its beauty. It runs agilely as if on wings." },
+            { id: 60, name: "Poliwag", types: ["water"], evolutions: [60, 61, 62], description: "Its newly grown legs prevent it from running. It appears to prefer swimming than trying to stand." },
+            { id: 61, name: "Poliwhirl", types: ["water"], evolutions: [60, 61, 62], description: "Capable of living in or out of water. When out of water, it sweats to keep its body slimy." },
+            { id: 62, name: "Poliwrath", types: ["water", "fighting"], evolutions: [60, 61, 62], description: "An adept swimmer at both the front crawl and breast stroke. Easily overtakes the best human swimmers." },
+            { id: 63, name: "Abra", types: ["psychic"], evolutions: [63, 64, 65], description: "Using its ability to read minds, it will identify impending danger and teleport to safety." },
+            { id: 64, name: "Kadabra", types: ["psychic"], evolutions: [63, 64, 65], description: "It emits special alpha waves from its body that induce headaches just by being close by." },
+            { id: 65, name: "Alakazam", types: ["psychic"], evolutions: [63, 64, 65], description: "Its brain can outperform a supercomputer. Its intelligence quotient is said to be 5,000." },
+            { id: 66, name: "Machop", types: ["fighting"], evolutions: [66, 67, 68], description: "Loves to build its muscles. It trains in all styles of martial arts to become even stronger." },
+            { id: 67, name: "Machoke", types: ["fighting"], evolutions: [66, 67, 68], description: "Its muscular body is so powerful, it must wear a power save belt to be able to regulate its motions." },
+            { id: 68, name: "Machamp", types: ["fighting"], evolutions: [66, 67, 68], description: "Using its heavy muscles, it throws powerful punches that can send the victim clear over the horizon." },
+            { id: 69, name: "Bellsprout", types: ["grass", "poison"], evolutions: [69, 70, 71], description: "A carnivorous Pokemon that traps and eats bugs. It uses its root feet to soak up needed moisture." },
+            { id: 70, name: "Weepinbell", types: ["grass", "poison"], evolutions: [69, 70, 71], description: "It spits out poisonpowder to immobilize the enemy and then finishes it with a spray of acid." },
+            { id: 71, name: "Victreebel", types: ["grass", "poison"], evolutions: [69, 70, 71], description: "Said to live in huge colonies deep in jungles, although no one has ever returned from there." },
+            { id: 72, name: "Tentacool", types: ["water", "poison"], evolutions: [72, 73], description: "Drifts in shallow seas. Anglers who hook them by accident are often punished by its stinging acid." },
+            { id: 73, name: "Tentacruel", types: ["water", "poison"], evolutions: [72, 73], description: "The tentacles are normally kept short. On hunts, they are extended to ensnare and immobilize prey." },
+            { id: 74, name: "Geodude", types: ["rock", "ground"], evolutions: [74, 75, 76], description: "Found in fields and mountains. Mistaking them for boulders, people often step or trip on them." },
+            { id: 75, name: "Graveler", types: ["rock", "ground"], evolutions: [74, 75, 76], description: "Rolls down slopes to move. It rolls over any obstacle without slowing or changing its direction." },
+            { id: 76, name: "Golem", types: ["rock", "ground"], evolutions: [74, 75, 76], description: "Its boulder-like body is extremely hard. It can easily withstand dynamite blasts without damage." },
+            { id: 77, name: "Ponyta", types: ["fire"], evolutions: [77, 78], description: "Its hooves are 10 times harder than diamonds. It can trample anything completely flat in little time." },
+            { id: 78, name: "Rapidash", types: ["fire"], evolutions: [77, 78], description: "Very competitive, this Pokemon will chase anything that moves fast in the hopes of racing it." },
+            { id: 79, name: "Slowpoke", types: ["water", "psychic"], evolutions: [79, 80], description: "Incredibly slow and dopey. It takes 5 seconds for it to feel pain when under attack." },
+            { id: 80, name: "Slowbro", types: ["water", "psychic"], evolutions: [79, 80], description: "The Shellder that is latched onto Slowpoke's tail is said to feed on the host's left over scraps." },
+            { id: 81, name: "Magnemite", types: ["electric", "steel"], evolutions: [81, 82], description: "Uses antigravity to stay suspended. Appears without warning and uses Thunder Wave and similar moves." },
+            { id: 82, name: "Magneton", types: ["electric", "steel"], evolutions: [81, 82], description: "Formed by several Magnemite linked together. They frequently appear when sunspots flare up." },
+            { id: 83, name: "Farfetch'd", types: ["normal", "flying"], evolutions: [83], description: "The sprig of green onions it holds is its weapon. It is used much like a metal sword." },
+            { id: 84, name: "Doduo", types: ["normal", "flying"], evolutions: [84, 85], description: "A bird that makes up for its poor flying with its fast foot speed. Leaves giant footprints." },
+            { id: 85, name: "Dodrio", types: ["normal", "flying"], evolutions: [84, 85], description: "Uses its three brains to execute complex plans. While two heads sleep, one head stays awake." },
+            { id: 86, name: "Seel", types: ["water"], evolutions: [86, 87], description: "The protruding horn on its head is very hard. It is used for bashing through thick ice." },
+            { id: 87, name: "Dewgong", types: ["water", "ice"], evolutions: [86, 87], description: "Stores thermal energy in its body. Swims at a steady 8 knots even in intensely cold waters." },
+            { id: 88, name: "Grimer", types: ["poison"], evolutions: [88, 89], description: "Appears in filthy areas. Thrives by sucking up polluted sludge that is pumped out of factories." },
+            { id: 89, name: "Muk", types: ["poison"], evolutions: [88, 89], description: "Thickly covered with a filthy, vile sludge. It is so toxic, even its footprints contain poison." },
+            { id: 90, name: "Shellder", types: ["water"], evolutions: [90, 91], description: "Its hard shell repels any kind of attack. It is vulnerable only when its shell is open." },
+            { id: 91, name: "Cloyster", types: ["water", "ice"], evolutions: [90, 91], description: "When attacked, it launches its horns in quick volleys. Its innards have never been seen." },
+            { id: 92, name: "Gastly", types: ["ghost", "poison"], evolutions: [92, 93, 94], description: "Almost invisible, this gaseous Pokemon cloaks the target and puts it to sleep without notice." },
+            { id: 93, name: "Haunter", types: ["ghost", "poison"], evolutions: [92, 93, 94], description: "Because of its ability to slip through block walls, it is said to be from another dimension." },
+            { id: 94, name: "Gengar", types: ["ghost", "poison"], evolutions: [92, 93, 94], description: "Under a full moon, this Pokemon likes to mimic the shadows of people and laugh at their fright." },
+            { id: 95, name: "Onix", types: ["rock", "ground"], evolutions: [95], description: "As it grows, the stone portions of its body harden to become similar to a diamond, but colored black." },
+            { id: 96, name: "Drowzee", types: ["psychic"], evolutions: [96, 97], description: "Puts enemies to sleep then eats their dreams. Occasionally gets sick from eating bad dreams." },
+            { id: 97, name: "Hypno", types: ["psychic"], evolutions: [96, 97], description: "When it locks eyes with an enemy, it will use a mix of psi moves such as Hypnosis and Confusion." },
+            { id: 98, name: "Krabby", types: ["water"], evolutions: [98, 99], description: "Its pincers are not only powerful weapons, they are used for balance when walking sideways." },
+            { id: 99, name: "Kingler", types: ["water"], evolutions: [98, 99], description: "The large pincer has 10000 hp of crushing power. The enormous pincer can move freely." },
+            { id: 100, name: "Voltorb", types: ["electric"], evolutions: [100, 101], description: "Usually found in power plants. Easily mistaken for a Poke Ball, they have zapped many people." },
+            { id: 101, name: "Electrode", types: ["electric"], evolutions: [100, 101], description: "It stores electric energy under very high pressure. It often explodes with little or no provocation." },
+            { id: 102, name: "Exeggcute", types: ["grass", "psychic"], evolutions: [102, 103], description: "Often mistaken for eggs. When disturbed, they quickly gather and attack in swarms." },
+            { id: 103, name: "Exeggutor", types: ["grass", "psychic"], evolutions: [102, 103], description: "Legend has it that on rare occasions, one of its heads will drop off and continue on as an Exeggcute." },
+            { id: 104, name: "Cubone", types: ["ground"], evolutions: [104, 105], description: "Because it never removes its skull helmet, no one has ever seen this Pokemon's real face." },
+            { id: 105, name: "Marowak", types: ["ground"], evolutions: [104, 105], description: "The bone it holds is its key weapon. It throws the bone skillfully like a boomerang to KO targets." },
+            { id: 106, name: "Hitmonlee", types: ["fighting"], evolutions: [106], description: "When in a hurry, its legs lengthen progressively. It runs smoothly with extra long, loping strides." },
+            { id: 107, name: "Hitmonchan", types: ["fighting"], evolutions: [107], description: "While apparently doing nothing, it fires punches in lightning fast volleys that are impossible to see." },
+            { id: 108, name: "Lickitung", types: ["normal"], evolutions: [108], description: "Its tongue can be extended like a chameleon's. It leaves a tingling sensation when it licks enemies." },
+            { id: 109, name: "Koffing", types: ["poison"], evolutions: [109, 110], description: "Because it stores several kinds of toxic gases in its body, it is prone to exploding without warning." },
+            { id: 110, name: "Weezing", types: ["poison"], evolutions: [109, 110], description: "Where two kinds of poison gases meet, two Koffings can fuse into a Weezing over many years." },
+            { id: 111, name: "Rhyhorn", types: ["ground", "rock"], evolutions: [111, 112], description: "Its massive bones are 1000 times harder than human bones. It can easily knock a trailer flying." },
+            { id: 112, name: "Rhydon", types: ["ground", "rock"], evolutions: [111, 112], description: "Protected by an armor-like hide, it is capable of living in molten lava of 3,600 degrees." },
+            { id: 113, name: "Chansey", types: ["normal"], evolutions: [113], description: "A rare and elusive Pokemon that is said to bring happiness to those who manage to get it." },
+            { id: 114, name: "Tangela", types: ["grass"], evolutions: [114], description: "The whole body is swathed with wide vines that are similar to seaweed. Its vines shake as it walks." },
+            { id: 115, name: "Kangaskhan", types: ["normal"], evolutions: [115], description: "The infant rarely ventures out of its mother's protective pouch until it is 3 years old." },
+            { id: 116, name: "Horsea", types: ["water"], evolutions: [116, 117], description: "Known to shoot down flying bugs with precision blasts of ink from the surface of the water." },
+            { id: 117, name: "Seadra", types: ["water"], evolutions: [116, 117], description: "Capable of swimming backwards by rapidly flapping its wing-like pectoral fins and stout tail." },
+            { id: 118, name: "Goldeen", types: ["water"], evolutions: [118, 119], description: "Its tail fin billows like an elegant ballroom dress, giving it the nickname of the Water Queen." },
+            { id: 119, name: "Seaking", types: ["water"], evolutions: [118, 119], description: "In the autumn spawning season, they can be seen swimming powerfully up rivers and creeks." },
+            { id: 120, name: "Staryu", types: ["water"], evolutions: [120, 121], description: "An enigmatic Pokemon that can effortlessly regenerate any appendage it loses in battle." },
+            { id: 121, name: "Starmie", types: ["water", "psychic"], evolutions: [120, 121], description: "Its central core glows with the seven colors of the rainbow. Some people value the core as a gem." },
+            { id: 122, name: "Mr. Mime", types: ["psychic", "fairy"], evolutions: [122], description: "If interrupted while it is miming, it will slap around the offender with its broad hands." },
+            { id: 123, name: "Scyther", types: ["bug", "flying"], evolutions: [123], description: "With ninja-like agility and speed, it can create the illusion that there is more than one." },
+            { id: 124, name: "Jynx", types: ["ice", "psychic"], evolutions: [124], description: "It seductively wiggles its hips as it walks. It can cause people to dance in unison with it." },
+            { id: 125, name: "Electabuzz", types: ["electric"], evolutions: [125], description: "Normally found near power plants, they can wander away and cause major blackouts in cities." },
+            { id: 126, name: "Magmar", types: ["fire"], evolutions: [126], description: "Its body always burns with an orange glow that enables it to hide perfectly among flames." },
+            { id: 127, name: "Pinsir", types: ["bug"], evolutions: [127], description: "If it fails to crush the victim in its pincers, it will swing it around and toss it hard." },
+            { id: 128, name: "Tauros", types: ["normal"], evolutions: [128], description: "When it targets an enemy, it charges furiously while whipping its body with its long tails." },
+            { id: 129, name: "Magikarp", types: ["water"], evolutions: [129, 130], description: "In the distant past, it was somewhat stronger than the horribly weak descendants that exist today." },
+            { id: 130, name: "Gyarados", types: ["water", "flying"], evolutions: [129, 130], description: "Rarely seen in the wild. Huge and vicious, it is capable of destroying entire cities in a rage." },
+            { id: 131, name: "Lapras", types: ["water", "ice"], evolutions: [131], description: "A Pokemon that has been overhunted almost to extinction. It can ferry people across the water." },
+            { id: 132, name: "Ditto", types: ["normal"], evolutions: [132], description: "Capable of copying an enemy's genetic code to instantly transform itself into a duplicate of the enemy." },
+            { id: 133, name: "Eevee", types: ["normal"], evolutions: [133, 134, 135, 136], description: "Its genetic code is irregular. It may mutate if it is exposed to radiation from element stones." },
+            { id: 134, name: "Vaporeon", types: ["water"], evolutions: [133, 134], description: "Lives close to water. Its long tail is ridged with a fin which is often mistaken for a mermaid's." },
+            { id: 135, name: "Jolteon", types: ["electric"], evolutions: [133, 135], description: "It accumulates negative ions in the atmosphere to blast out 10000-volt lightning bolts." },
+            { id: 136, name: "Flareon", types: ["fire"], evolutions: [133, 136], description: "When storing thermal energy in its body, its temperature could soar to over 1600 degrees." },
+            { id: 137, name: "Porygon", types: ["normal"], evolutions: [137], description: "A Pokemon that consists entirely of programming code. Capable of moving freely in cyberspace." },
+            { id: 138, name: "Omanyte", types: ["rock", "water"], evolutions: [138, 139], description: "Although long extinct, in rare cases, it can be genetically resurrected from fossils." },
+            { id: 139, name: "Omastar", types: ["rock", "water"], evolutions: [138, 139], description: "A prehistoric Pokemon that died out when its heavy shell made it impossible to catch prey." },
+            { id: 140, name: "Kabuto", types: ["rock", "water"], evolutions: [140, 141], description: "A Pokemon that was resurrected from a fossil found in what was once the ocean floor eons ago." },
+            { id: 141, name: "Kabutops", types: ["rock", "water"], evolutions: [140, 141], description: "Its sleek shape is perfect for swimming. It slashes prey with its claws and drains the body fluids." },
+            { id: 142, name: "Aerodactyl", types: ["rock", "flying"], evolutions: [142], description: "A ferocious, prehistoric Pokemon that goes for the enemy's throat with its serrated saw-like fangs." },
+            { id: 143, name: "Snorlax", types: ["normal"], evolutions: [143], description: "Very lazy. Just eats and sleeps. As its rotund bulk builds, it becomes steadily more slothful." },
+            { id: 144, name: "Articuno", types: ["ice", "flying"], evolutions: [144], description: "A legendary bird Pokemon that is said to appear to doomed people who are lost in icy mountains." },
+            { id: 145, name: "Zapdos", types: ["electric", "flying"], evolutions: [145], description: "A legendary bird Pokemon that is said to appear from clouds while dropping enormous lightning bolts." },
+            { id: 146, name: "Moltres", types: ["fire", "flying"], evolutions: [146], description: "Known as the legendary bird of fire. Every flap of its wings creates a dazzling flash of flames." },
+            { id: 147, name: "Dratini", types: ["dragon"], evolutions: [147, 148, 149], description: "Long considered a mythical Pokemon until recently when a small colony was found living underwater." },
+            { id: 148, name: "Dragonair", types: ["dragon"], evolutions: [147, 148, 149], description: "A mystical Pokemon that exudes a gentle aura. Has the ability to change climate conditions." },
+            { id: 149, name: "Dragonite", types: ["dragon", "flying"], evolutions: [147, 148, 149], description: "An extremely rarely seen marine Pokemon. Its intelligence is said to match that of humans." },
+            { id: 150, name: "Mewtwo", types: ["psychic"], evolutions: [150], description: "It was created by a scientist after years of horrific gene splicing and DNA engineering experiments." },
+            { id: 151, name: "Mew", types: ["psychic"], evolutions: [151], description: "So rare that it is still said to be a mirage by many experts. Only a few people have seen it worldwide." }
+        ];
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbrZCDKT5F3iTHBWlQXJ42VdwuZedwnDg",
+            authDomain: "pokemon-tracker-e4015.firebaseapp.com",
+            databaseURL: "https://pokemon-tracker-e4015-default-rtdb.firebaseio.com",
+            projectId: "pokemon-tracker-e4015",
+            storageBucket: "pokemon-tracker-e4015.firebasestorage.app",
+            messagingSenderId: "330433409536",
+            appId: "1:330433409536:web:dda975ef4c886ff0a31ee5"
+        };
+
+        // Initialize Firebase
+        let database;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            console.log("Firebase initialized successfully");
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            alert("Firebase not configured. Please add your Firebase config to use sync features.");
+        }
+
+        // Seen Pokemon tracking with Firebase
+        let seenPokemon = {};
+        let favoritePokemon = {};
+        let currentPokemon = null;
+
+        // Load seen Pokemon from Firebase
+        function loadSeenPokemon() {
+            if (!database) {
+                // Fallback to localStorage if Firebase not configured
+                const saved = localStorage.getItem('vivSeenPokemon');
+                if (saved) seenPokemon = JSON.parse(saved);
+                return;
+            }
+            
+            database.ref('viv/seen').on('value', (snapshot) => {
+                seenPokemon = snapshot.val() || {};
+                updateAllCards();
+            });
+        }
+
+        // Save seen Pokemon to Firebase
+        function saveSeenPokemon() {
+            if (!database) {
+                // Fallback to localStorage if Firebase not configured
+                localStorage.setItem('vivSeenPokemon', JSON.stringify(seenPokemon));
+                return;
+            }
+            
+            database.ref('viv/seen').set(seenPokemon);
+        }
+        
+        // Load favorite Pokemon from Firebase
+        function loadFavoritePokemon() {
+            if (!database) {
+                // Fallback to localStorage if Firebase not configured
+                const saved = localStorage.getItem('vivFavoritePokemon');
+                if (saved) favoritePokemon = JSON.parse(saved);
+                return;
+            }
+            
+            database.ref('viv/favorites').on('value', (snapshot) => {
+                favoritePokemon = snapshot.val() || {};
+                updateAllCards();
+            });
+        }
+
+        // Save favorite Pokemon to Firebase
+        function saveFavoritePokemon() {
+            if (!database) {
+                // Fallback to localStorage if Firebase not configured
+                localStorage.setItem('vivFavoritePokemon', JSON.stringify(favoritePokemon));
+                return;
+            }
+            
+            database.ref('viv/favorites').set(favoritePokemon);
+        }
+        
+        // Update all cards when data changes
+        function updateAllCards() {
+            const grid = document.getElementById('pokemonGrid');
+            if (!grid || !grid.children.length) return;
+            
+            sortPokemonGrid();
+        }
+
+        // Toggle favorite status
+        function toggleFavorite(event) {
+            event.stopPropagation();
+            if (!currentPokemon) return;
+            
+            const pokemonId = currentPokemon.id;
+            favoritePokemon[pokemonId] = !favoritePokemon[pokemonId];
+            saveFavoritePokemon();
+            
+            // Update button display
+            const btn = document.getElementById('favoriteBtn');
+            if (favoritePokemon[pokemonId]) {
+                btn.classList.add('active');
+                btn.innerHTML = '⭐'; // Filled yellow star
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '☆'; // Outline star
+            }
+            
+            // Update the card appearance and re-sort
+            sortPokemonGrid();
+        }
+
+        // Toggle seen status
+        function toggleSeen(event) {
+            event.stopPropagation();
+            if (!currentPokemon) return;
+            
+            const pokemonId = currentPokemon.id;
+            seenPokemon[pokemonId] = !seenPokemon[pokemonId];
+            saveSeenPokemon();
+            
+            // Update checkbox display
+            const checkbox = document.getElementById('seenCheckboxIcon');
+            if (seenPokemon[pokemonId]) {
+                checkbox.classList.add('checked');
+            } else {
+                checkbox.classList.remove('checked');
+            }
+            
+            // Update the grid card
+            updatePokemonCard(pokemonId);
+        }
+
+        // Update Pokemon card visual in grid
+        function updatePokemonCard(pokemonId) {
+            const cards = document.querySelectorAll('.pokemon-card');
+            cards.forEach(card => {
+                const cardData = pokemonData.find(p => p.id === pokemonId);
+                if (card.querySelector('img')?.alt === cardData?.name) {
+                    if (seenPokemon[pokemonId]) {
+                        card.classList.add('seen');
+                    } else {
+                        card.classList.remove('seen');
+                    }
+                }
+            });
+        }
+
+        // Sort existing Pokemon grid cards
+        function sortPokemonGrid() {
+            const grid = document.getElementById('pokemonGrid');
+            const cards = Array.from(grid.children);
+            
+            // Create array of cards with their pokemon data for sorting
+            const cardsWithData = cards.map(card => {
+                const pokemonName = card.querySelector('.pokemon-name').textContent;
+                const pokemon = pokemonData.find(p => p.name === pokemonName);
+                
+                // Update card classes
+                if (pokemon) {
+                    if (favoritePokemon[pokemon.id]) {
+                        card.classList.add('favorite');
+                    } else {
+                        card.classList.remove('favorite');
+                    }
+                }
+                
+                return { card, pokemon };
+            });
+            
+            // Sort
+            cardsWithData.sort((a, b) => {
+                const aFav = a.pokemon && favoritePokemon[a.pokemon.id] ? 1 : 0;
+                const bFav = b.pokemon && favoritePokemon[b.pokemon.id] ? 1 : 0;
+                
+                if (aFav !== bFav) {
+                    return bFav - aFav; // Favorites first
+                }
+                return (a.pokemon?.id || 0) - (b.pokemon?.id || 0); // Then by ID
+            });
+            
+            // Clear grid and re-append in sorted order
+            grid.innerHTML = '';
+            cardsWithData.forEach(item => {
+                grid.appendChild(item.card);
+            });
+        }
+
+        // Filter Pokemon based on search
+        function filterPokemon() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase().trim();
+            const cards = document.querySelectorAll('.pokemon-card');
+            
+            cards.forEach((card) => {
+                const nameElement = card.querySelector('.pokemon-name');
+                const pokemonName = nameElement ? nameElement.textContent.toLowerCase() : '';
+                const pokemon = pokemonData.find(p => p.name.toLowerCase() === pokemonName);
+                
+                if (!pokemon) {
+                    card.classList.add('hidden');
+                    return;
+                }
+                
+                const nameMatch = pokemon.name.toLowerCase().includes(searchTerm);
+                const typeMatch = pokemon.types.some(type => type.toLowerCase().includes(searchTerm));
+                
+                if (searchTerm === '' || nameMatch || typeMatch) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+        }
+
+        function createPokemonGrid() {
+            const grid = document.getElementById('pokemonGrid');
+            
+            // Sort Pokemon: favorites first, then by ID
+            const sortedPokemon = [...pokemonData].sort((a, b) => {
+                const aFav = favoritePokemon[a.id] ? 1 : 0;
+                const bFav = favoritePokemon[b.id] ? 1 : 0;
+                
+                if (aFav !== bFav) {
+                    return bFav - aFav; // Favorites first
+                }
+                return a.id - b.id; // Then by ID
+            });
+            
+            sortedPokemon.forEach(pokemon => {
+                const card = document.createElement('div');
+                card.className = 'pokemon-card';
+                if (seenPokemon[pokemon.id]) {
+                    card.classList.add('seen');
+                }
+                if (favoritePokemon[pokemon.id]) {
+                    card.classList.add('favorite');
+                }
+                card.onclick = () => openModal(pokemon);
+                
+                card.innerHTML = `
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png" alt="${pokemon.name}">
+                    <div class="pokemon-name">${pokemon.name}</div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function openModal(pokemon) {
+            currentPokemon = pokemon;
+            const modal = document.getElementById('modal');
+            const modalImg = document.getElementById('modalImg');
+            const modalName = document.getElementById('modalName');
+            const pokemonDescription = document.getElementById('pokemonDescription');
+            const modalTypes = document.getElementById('modalTypes');
+            const evolutionSection = document.getElementById('evolutionSection');
+            const seenCheckboxIcon = document.getElementById('seenCheckboxIcon');
+            const favoriteBtn = document.getElementById('favoriteBtn');
+
+            modalImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`;
+            modalImg.onerror = function() {
+                this.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`;
+            };
+            modalName.textContent = pokemon.name;
+            
+            // Display description
+            pokemonDescription.innerHTML = `<p>${pokemon.description}</p>`;
+            
+            // Update seen checkbox
+            if (seenPokemon[pokemon.id]) {
+                seenCheckboxIcon.classList.add('checked');
+            } else {
+                seenCheckboxIcon.classList.remove('checked');
+            }
+            
+            // Update favorite button
+            if (favoritePokemon[pokemon.id]) {
+                favoriteBtn.classList.add('active');
+                favoriteBtn.innerHTML = '⭐'; // Filled yellow star
+            } else {
+                favoriteBtn.classList.remove('active');
+                favoriteBtn.innerHTML = '☆'; // Outline star
+            }
+
+            modalTypes.innerHTML = pokemon.types.map(type => `
+                <div class="type-badge type-${type}">
+                    <span class="type-icon">${typeIcons[type]}</span>
+                    <span>${type.toUpperCase()}</span>
+                </div>
+            `).join('');
+
+            if (pokemon.evolutions.length > 1) {
+                const evolutionHTML = pokemon.evolutions.map((evoId, index) => {
+                    const evoPokemon = pokemonData.find(p => p.id === evoId);
+                    const arrow = index < pokemon.evolutions.length - 1 ? '<div class="evolution-arrow">→</div>' : '';
+                    const seenClass = seenPokemon[evoId] ? 'seen' : '';
+                    return `
+                        <div class="evolution-stage ${seenClass}" onclick="event.stopPropagation(); openModal(pokemonData.find(p => p.id === ${evoId}));" style="cursor: pointer;">
+                            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${evoId}.png" alt="${evoPokemon.name}">
+                            <div class="evolution-stage-name">${evoPokemon.name}</div>
+                        </div>
+                        ${arrow}
+                    `;
+                }).join('');
+
+                evolutionSection.innerHTML = `
+                    <div class="evolution-section">
+                        <div class="evolution-title">Evolution 🌟</div>
+                        <div class="evolution-chain">
+                            ${evolutionHTML}
+                        </div>
+                    </div>
+                `;
+            } else {
+                evolutionSection.innerHTML = `
+                    <div class="no-evolve">
+                        <div class="evolution-title">Doesn't Evolve ⭐</div>
+                    </div>
+                `;
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Initialize
+        loadSeenPokemon();
+        loadFavoritePokemon();
+        createPokemonGrid();
+    </script>
+</body>
+</html>
