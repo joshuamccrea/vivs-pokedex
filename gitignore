@@ -1,0 +1,14 @@
+# Optional: Add this if you don't want to commit the pokemon images to git
+# (You can add them separately or use a different hosting solution)
+# *.png
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
